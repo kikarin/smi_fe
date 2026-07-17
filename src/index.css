@@ -1,0 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Urbanist', ui-sans-serif, system-ui, sans-serif;
+
+  --color-bg: #F4F3F1;
+  --color-sidebar: #F7F6F4;
+  --color-card: #FCFBF9;
+  --color-border: #E9E7E3;
+  --color-divider: #EFEDE9;
+  --color-text: #1F1F1F;
+  --color-muted: #767676;
+  --color-faint: #A5A5A5;
+
+  --color-brand: #3AA39A;
+  --color-brand-hover: #2F9189;
+  --color-brand-light: #DDF4F2;
+
+  --color-highlight: #EEFF8C;
+  --color-highlight-hover: #F5FFD1;
+
+  --color-success: #6BC98F;
+  --color-warning: #F8C35E;
+  --color-danger: #E96D6D;
+
+  --radius-card: 24px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: 'Urbanist', ui-sans-serif, system-ui, sans-serif;
+  background-color: #F4F3F1;
+  color: #1F1F1F;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #E9E7E3;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #A5A5A5;
+}
