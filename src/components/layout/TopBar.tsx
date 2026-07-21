@@ -8,8 +8,9 @@ const titles: Record<string, string> = {
   '/app/customers': 'Customers',
   '/app/knowledge': 'Knowledge',
   '/app/leads': 'Leads',
-  '/app/chat': 'Chat AI',
+  '/app/chat': 'Chat (admin)',
   '/app/quotations': 'Quotations',
+  '/app/users': 'Sales Users',
 }
 
 export function TopBar() {
@@ -17,7 +18,8 @@ export function TopBar() {
   const navigate = useNavigate()
   const logout = useAuthStore((s) => s.logout)
   const user = useAuthStore((s) => s.user)
-  const pageTitle = titles[location.pathname] ?? 'SalesMind AI'
+  let pageTitle = titles[location.pathname] ?? 'SalesMind AI'
+  if (location.pathname === '/app/leads' && user?.role === 'sales') pageTitle = 'My Leads'
 
   function handleLogout() {
     logout()

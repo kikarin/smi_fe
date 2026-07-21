@@ -33,6 +33,12 @@ export type Lead = {
   customer_id: number
   customer_name: string
   status: string
+  source?: string
+  assigned_to?: number | null
+  assignee_name?: string | null
+  product_id?: number | null
+  product_name?: string | null
+  handoff_reason?: string | null
   notes: string | null
   created_at: string
   updated_at: string

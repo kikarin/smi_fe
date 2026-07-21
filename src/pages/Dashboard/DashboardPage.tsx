@@ -3,8 +3,12 @@ import { useQuery } from '@tanstack/react-query'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { formatRp } from '@/lib/format'
 import { fetchDashboardStats } from '@/services/productService'
+import { useAuthStore } from '@/store/authStore'
 
 export function DashboardPage() {
+  const role = useAuthStore((s) => s.user?.role)
+  const isAdmin = role === 'admin'
+
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: fetchDashboardStats,
@@ -17,18 +21,28 @@ export function DashboardPage() {
     { label: 'Total percakapan', value: data?.conversations },
   ]
 
-  const shortcuts = [
-    { to: '/app/chat', title: 'Chat AI', desc: 'Rekomendasi laptop dari katalog' },
-    { to: '/app/leads', title: 'Leads', desc: 'Pipeline new → qualified → won' },
-    { to: '/app/quotations', title: 'Quotations', desc: 'Generate & unduh PDF Rupiah' },
-    { to: '/app/products', title: 'Products', desc: 'Katalog ASUS (harga database)' },
-  ]
+  const shortcuts = isAdmin
+    ? [
+        { to: '/app/leads', title: 'Leads', desc: 'Pipeline new / qualified / won' },
+        { to: '/app/quotations', title: 'Quotations', desc: 'Generate & unduh PDF Rupiah' },
+        { to: '/app/products', title: 'Products', desc: 'CRUD katalog ASUS' },
+        { to: '/app/chat', title: 'Chat (admin)', desc: 'Impersonate customer (demo internal)' },
+      ]
+    : [
+        { to: '/app/leads', title: 'My Leads', desc: 'Lead yang di-assign ke Anda' },
+        { to: '/app/quotations', title: 'Quotations', desc: 'Generate & unduh PDF Rupiah' },
+        { to: '/app/products', title: 'Products', desc: 'Lihat katalog (read-only)' },
+      ]
 
   return (
     <div>
       <PageHeader
         title="Dashboard"
-        description="Ringkasan SalesMind AI — katalog laptop ASUS & aktivitas sales (Bahasa Indonesia, Rp)."
+        description={
+          isAdmin
+            ? 'Ringkasan admin - katalog, CRM, knowledge. Pintu customer demo ada di landing `/`.'
+            : 'Workspace sales - My Leads & Quotations. Chat customer ada di landing publik `/`.'
+        }
       />
 
       {isError ? (
@@ -42,7 +56,7 @@ export function DashboardPage() {
           <div key={w.label} className="rounded-[16px] border border-border bg-card p-4">
             <div className="text-xs font-medium text-faint">{w.label}</div>
             <div className="mt-2 text-2xl font-bold text-text">
-              {isLoading ? '…' : isError ? '—' : (w.value ?? 0)}
+              {isLoading ? '...' : isError ? '-' : (w.value ?? 0)}
             </div>
           </div>
         ))}
@@ -64,8 +78,8 @@ export function DashboardPage() {
       <div className="mt-6 rounded-[16px] border border-border bg-card p-5">
         <h2 className="text-sm font-bold text-text">Alur demo singkat</h2>
         <p className="mt-2 text-sm text-muted">
-          Chat (budget + kebutuhan) → rekomendasi dari database → lead CRM → quotation PDF. Contoh
-          harga katalog: {formatRp(14_999_000)} (Vivobook S14 OLED).
+          Landing `/` (chat customer) - tertarik - lead - console My Leads - quotation PDF.
+          Knowledge gap - WA sales. Contoh harga: {formatRp(14_999_000)} (Vivobook S14 OLED).
         </p>
       </div>
     </div>

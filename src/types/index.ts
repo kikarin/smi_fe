@@ -1,3 +1,4 @@
+export type { PublicProduct } from './public'
 export type { AuthUser, LoginPayload, LoginResponse } from './auth'
 export type {
   Product,

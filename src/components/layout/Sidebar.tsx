@@ -2,18 +2,32 @@ import { NavLink } from 'react-router-dom'
 import { Icon, type IconName } from '@/components/ui/Icon'
 import { useAuthStore } from '@/store/authStore'
 
-const navItems: { to: string; label: string; icon: IconName }[] = [
-  { to: '/app', label: 'Dashboard', icon: 'home' },
-  { to: '/app/chat', label: 'Chat AI', icon: 'chat' },
-  { to: '/app/products', label: 'Products', icon: 'box' },
-  { to: '/app/customers', label: 'Customers', icon: 'users' },
-  { to: '/app/knowledge', label: 'Knowledge', icon: 'book' },
-  { to: '/app/leads', label: 'Leads', icon: 'funnel' },
-  { to: '/app/quotations', label: 'Quotations', icon: 'doc' },
+type NavItem = {
+  to: string
+  label: string
+  icon: IconName
+  roles: Array<'admin' | 'sales'>
+}
+
+const navItems: NavItem[] = [
+  { to: '/app', label: 'Dashboard', icon: 'home', roles: ['admin', 'sales'] },
+  { to: '/app/leads', label: 'Leads', icon: 'funnel', roles: ['admin', 'sales'] },
+  { to: '/app/quotations', label: 'Quotations', icon: 'doc', roles: ['admin', 'sales'] },
+  { to: '/app/products', label: 'Products', icon: 'box', roles: ['admin', 'sales'] },
+  { to: '/app/customers', label: 'Customers', icon: 'users', roles: ['admin'] },
+  { to: '/app/knowledge', label: 'Knowledge', icon: 'book', roles: ['admin'] },
+  { to: '/app/users', label: 'Sales Users', icon: 'users', roles: ['admin'] },
+  { to: '/app/chat', label: 'Chat (admin)', icon: 'chat', roles: ['admin'] },
 ]
 
 export function Sidebar() {
   const user = useAuthStore((s) => s.user)
+  const role = (user?.role === 'sales' ? 'sales' : 'admin') as 'admin' | 'sales'
+  const items = navItems
+    .filter((item) => item.roles.includes(role))
+    .map((item) =>
+      item.to === '/app/leads' && role === 'sales' ? { ...item, label: 'My Leads' } : item,
+    )
 
   return (
     <aside className="flex w-[188px] shrink-0 flex-col overflow-hidden border-r border-border bg-sidebar">
@@ -34,7 +48,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2.5">
-        {navItems.map((item) => (
+        {items.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -63,8 +77,8 @@ export function Sidebar() {
             {(user?.name ?? 'AD').slice(0, 2).toUpperCase()}
           </div>
           <div className="min-w-0 overflow-hidden">
-            <div className="truncate text-xs font-semibold text-text">{user?.name ?? 'Admin'}</div>
-            <div className="text-[10px] text-faint">Administrator</div>
+            <div className="truncate text-xs font-semibold text-text">{user?.name ?? 'User'}</div>
+            <div className="text-[10px] capitalize text-faint">{user?.role ?? 'user'}</div>
           </div>
         </div>
       </div>

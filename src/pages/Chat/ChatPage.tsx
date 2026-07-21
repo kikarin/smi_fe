@@ -174,8 +174,8 @@ export function ChatPage() {
   return (
     <div className="flex h-[calc(100vh-7rem)] flex-col">
       <PageHeader
-        title="Chat AI"
-        description="Pilih customer → chat. Riwayat percakapan tetap tersimpan saat pindah halaman."
+        title="Chat (admin demo)"
+        description="Impersonate customer untuk tes internal. Pintu customer demo: landing `/` (tanpa login)."
       />
 
       <div className="mb-3 flex flex-wrap items-center gap-2">

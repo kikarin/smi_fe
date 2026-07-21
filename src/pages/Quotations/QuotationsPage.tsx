@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/Button'
@@ -17,11 +18,13 @@ function formatRp(value: number) {
 
 export function QuotationsPage() {
   const queryClient = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [error, setError] = useState<string | null>(null)
   const [customerId, setCustomerId] = useState<number | ''>('')
   const [productId, setProductId] = useState<number | ''>('')
   const [qty, setQty] = useState(1)
   const [downloadingId, setDownloadingId] = useState<number | null>(null)
+  const leadHint = searchParams.get('lead_id')
 
   const { data: quotations = [], isLoading } = useQuery({
     queryKey: ['quotations'],
@@ -36,6 +39,13 @@ export function QuotationsPage() {
     queryFn: fetchProducts,
   })
 
+  useEffect(() => {
+    const c = searchParams.get('customer_id')
+    const p = searchParams.get('product_id')
+    if (c && !Number.isNaN(Number(c))) setCustomerId(Number(c))
+    if (p && !Number.isNaN(Number(p))) setProductId(Number(p))
+  }, [searchParams])
+
   const selectedProduct = useMemo(
     () => products.find((p) => p.id === productId),
     [products, productId],
@@ -44,10 +54,18 @@ export function QuotationsPage() {
 
   const createMutation = useMutation({
     mutationFn: createQuotation,
-    onSuccess: async () => {
+    onSuccess: async (q) => {
       await queryClient.invalidateQueries({ queryKey: ['quotations'] })
       setError(null)
       setQty(1)
+      try {
+        await downloadQuotationPdf(q.id)
+      } catch {
+        void 0
+      }
+      if (searchParams.has('customer_id') || searchParams.has('lead_id')) {
+        setSearchParams({})
+      }
     },
     onError: (err: Error) => setError(err.message),
   })
@@ -76,11 +94,16 @@ export function QuotationsPage() {
     <div>
       <PageHeader
         title="Quotations"
-        description="Generate & unduh quotation PDF (customer, produk, qty, total Rupiah)."
+        description="Generate & unduh quotation PDF (customer, produk, qty, total Rupiah). Bisa dari Leads."
       />
 
       <div className="mb-4 rounded-[16px] border border-border bg-card p-4">
-        <p className="mb-3 text-sm font-semibold text-text">Buat quotation</p>
+        <p className="mb-3 text-sm font-semibold text-text">
+          Buat quotation
+          {leadHint ? (
+            <span className="ml-2 text-xs font-normal text-muted">(dari lead #{leadHint})</span>
+          ) : null}
+        </p>
         <div className="flex flex-wrap items-end gap-3">
           <label className="flex min-w-[200px] flex-col gap-1 text-xs text-muted">
             Customer
@@ -89,7 +112,7 @@ export function QuotationsPage() {
               onChange={(e) => setCustomerId(e.target.value ? Number(e.target.value) : '')}
               className="rounded-sm border border-border bg-bg px-3 py-2 text-sm text-text outline-none"
             >
-              <option value="">Pilih…</option>
+              <option value="">Pilih...</option>
               {customers.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -104,10 +127,10 @@ export function QuotationsPage() {
               onChange={(e) => setProductId(e.target.value ? Number(e.target.value) : '')}
               className="rounded-sm border border-border bg-bg px-3 py-2 text-sm text-text outline-none"
             >
-              <option value="">Pilih…</option>
+              <option value="">Pilih...</option>
               {products.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name} — {formatRp(Number(p.price))}
+                  {p.name} - {formatRp(Number(p.price))}
                 </option>
               ))}
             </select>
@@ -123,7 +146,7 @@ export function QuotationsPage() {
             />
           </label>
           <div className="pb-2 text-sm font-semibold text-text">
-            Total: {selectedProduct ? formatRp(previewTotal) : '—'}
+            Total: {selectedProduct ? formatRp(previewTotal) : '-'}
           </div>
           <Button
             type="button"
@@ -136,19 +159,24 @@ export function QuotationsPage() {
               })
             }
           >
-            {createMutation.isPending ? 'Membuat…' : 'Generate PDF'}
+            {createMutation.isPending ? 'Membuat...' : 'Generate PDF'}
           </Button>
         </div>
+        {!productId && leadHint ? (
+          <p className="mt-2 text-xs text-muted">
+            Lead belum punya produk minat - pilih produk lalu Generate PDF.
+          </p>
+        ) : null}
       </div>
 
       {error ? <p className="mb-3 text-xs text-danger">{error}</p> : null}
 
       {isLoading ? (
-        <p className="text-sm text-muted">Memuat quotations…</p>
+        <p className="text-sm text-muted">Memuat quotations...</p>
       ) : quotations.length === 0 ? (
         <div className="rounded-[16px] border border-dashed border-border bg-card p-10 text-center">
           <p className="text-sm text-muted">
-            Belum ada quotation. Buat di form di atas, atau minta AI “buatkan quotation”.
+            Belum ada quotation. Buat dari form di atas atau tombol Quotation di halaman Leads.
           </p>
         </div>
       ) : (
@@ -181,7 +209,7 @@ export function QuotationsPage() {
                         disabled={downloadingId === q.id}
                         onClick={() => handleDownload(q.id)}
                       >
-                        {downloadingId === q.id ? '…' : 'Download PDF'}
+                        {downloadingId === q.id ? '...' : 'Download PDF'}
                       </Button>
                       <button
                         type="button"

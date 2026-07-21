@@ -1,7 +1,8 @@
 @import 'tailwindcss';
 
 @theme {
-  --font-sans: 'Satoshi', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
 
   --color-bg: #F4F3F1;
   --color-sidebar: #F7F6F4;
@@ -23,6 +24,11 @@
   --color-warning: #F8C35E;
   --color-danger: #E96D6D;
 
+  /* dark graphite surface — hero panels, chat bezel, AI avatars */
+  --color-ink: #12151A;
+  --color-ink-hover: #1C2028;
+  --color-ink-soft: rgba(255, 255, 255, 0.6);
+
   --radius-card: 24px;
   --radius-md: 12px;
   --radius-sm: 8px;
@@ -36,9 +42,20 @@ html, body, #root {
   height: 100%;
   margin: 0;
   padding: 0;
-  font-family: 'Satoshi', ui-sans-serif, system-ui, sans-serif;
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
   background-color: #F4F3F1;
   color: #1F1F1F;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.02em;
 }
 
 ::-webkit-scrollbar {

@@ -10,7 +10,11 @@ function renderInline(text: string): ReactNode[] {
     if (match.index > last) {
       parts.push(text.slice(last, match.index))
     }
-    parts.push(<strong key={`b-${key++}`}>{match[1]}</strong>)
+    parts.push(
+      <strong key={`b-${key++}`} className="font-bold text-text">
+        {match[1]}
+      </strong>,
+    )
     last = match.index + match[0].length
   }
   if (last < text.length) parts.push(text.slice(last))
@@ -74,7 +78,7 @@ export function ChatMarkdown({ content }: { content: string }) {
       {blocks.map((block, i) => {
         if (block.type === 'ul') {
           return (
-            <ul key={i} className="list-disc space-y-1 pl-5">
+            <ul key={i} className="marker:text-brand space-y-1 pl-5 [&>li]:list-disc">
               {block.items.map((item, j) => (
                 <li key={j}>{renderInline(item)}</li>
               ))}

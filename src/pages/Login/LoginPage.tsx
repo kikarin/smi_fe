@@ -61,7 +61,7 @@ export function LoginPage() {
           </div>
           <div>
             <h1 className="text-lg font-bold text-text">SalesMind AI</h1>
-            <p className="text-sm text-muted">Masuk sebagai Admin</p>
+            <p className="text-sm text-muted">Masuk console (admin / sales)</p>
           </div>
         </div>
 
@@ -97,8 +97,10 @@ export function LoginPage() {
           </Button>
         </form>
 
-        <p className="mt-6 text-center text-[11px] text-faint">
-          Demo laptop sales · harga Rupiah · Bahasa Indonesia
+        <p className="mt-3 text-center text-[11px]">
+          <a href="/" className="text-muted underline-offset-2 hover:text-text hover:underline">
+            Kembali ke landing
+          </a>
         </p>
       </div>
     </div>
