@@ -1,6 +1,13 @@
 import { useAuthStore } from '@/store/authStore'
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+function resolveBaseUrl(): string {
+  const env = import.meta.env.VITE_API_BASE_URL
+  if (env !== undefined && env !== '') return env.replace(/\/$/, '')
+  if (import.meta.env.DEV) return ''
+  return 'http://localhost:8000'
+}
+
+export const API_BASE_URL = resolveBaseUrl()
 
 export class ApiError extends Error {
   status: number
@@ -27,7 +34,7 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   const token = useAuthStore.getState().token
   const isFormData = typeof FormData !== 'undefined' && body instanceof FormData
 
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
     ...rest,
     headers: {
       Accept: 'application/json',
@@ -56,5 +63,5 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
 export function mediaUrl(path: string | null | undefined): string | null {
   if (!path) return null
   if (path.startsWith('http://') || path.startsWith('https://')) return path
-  return `${BASE_URL}${path}`
+  return `${API_BASE_URL}${path}`
 }

@@ -1,65 +1,89 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { PageHeader } from '@/components/ui/PageHeader'
-import { Button } from '@/components/ui/Button'
 import {
-  createLead,
-  deleteLead,
-  fetchAssignees,
-  fetchLeads,
-  updateLead,
-} from '@/services/leadService'
+  Badge,
+  ConfirmDelete,
+  EmptyState,
+  Field,
+  LEAD_STATUS,
+  Mono,
+  Notice,
+  PageHeader,
+  Panel,
+  PanelBar,
+  SearchField,
+  SkeletonRows,
+  fieldClass,
+  leadStatus,
+  tdClass,
+  thClass,
+  trClass,
+} from '@/components/console/kit'
+import { Button } from '@/components/ui/Button'
+import { Drawer } from '@/components/ui/Drawer'
+import { Dropdown } from '@/components/ui/Dropdown'
+import { Icon } from '@/components/ui/Icon'
+import { formatDate, formatRelative } from '@/lib/format'
+import { createLead, deleteLead, fetchAssignees, fetchLeads, updateLead } from '@/services/leadService'
 import { fetchCustomers } from '@/services/customerService'
 import { createQuotation, downloadQuotationPdf } from '@/services/quotationService'
 import { useAuthStore } from '@/store/authStore'
 import type { Lead } from '@/types'
 
-const PIPELINE = ['new', 'qualified', 'won', 'lost'] as const
+const SOURCE_LABEL: Record<string, string> = {
+  web_chat: 'chat landing',
+  manual: 'manual',
+}
 
 export function LeadsPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const user = useAuthStore((s) => s.user)
   const isAdmin = user?.role === 'admin'
   const [error, setError] = useState<string | null>(null)
   const [draftNotes, setDraftNotes] = useState<Record<number, string>>({})
-  const [createOpen, setCreateOpen] = useState(false)
-  const [newCustomerId, setNewCustomerId] = useState<number | ''>('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [search, setSearch] = useState('')
+  const [createOpen, setCreateOpen] = useState(searchParams.get('baru') === '1')
+  const [newCustomerId, setNewCustomerId] = useState('')
   const [newNotes, setNewNotes] = useState('')
+  const [createTried, setCreateTried] = useState(false)
   const [quotingId, setQuotingId] = useState<number | null>(null)
 
-  const { data: leads = [], isLoading } = useQuery({
-    queryKey: ['leads'],
-    queryFn: fetchLeads,
-  })
+  useEffect(() => {
+    if (searchParams.get('baru') !== '1') return
+    setCreateOpen(true)
+    setSearchParams({}, { replace: true })
+  }, [searchParams, setSearchParams])
 
-  const { data: customers = [] } = useQuery({
-    queryKey: ['customers'],
-    queryFn: fetchCustomers,
-  })
-
+  const leadsQuery = useQuery({ queryKey: ['leads'], queryFn: fetchLeads })
+  const leads = useMemo(() => leadsQuery.data ?? [], [leadsQuery.data])
+  const { data: customers = [] } = useQuery({ queryKey: ['customers'], queryFn: fetchCustomers })
   const { data: assignees = [] } = useQuery({
     queryKey: ['lead-assignees'],
     queryFn: fetchAssignees,
     enabled: isAdmin,
   })
 
+  const invalidate = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['leads'] })
+    await queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+  }
+
   const updateMutation = useMutation({
-    mutationFn: ({
-      id,
-      status,
-      notes,
-      assigned_to,
-    }: {
-      id: number
-      status?: string
-      notes?: string | null
-      assigned_to?: number | null
-    }) => updateLead(id, { status, notes, assigned_to }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['leads'] })
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+    mutationFn: ({ id, ...payload }: { id: number; status?: string; notes?: string | null; assigned_to?: number | null }) =>
+      updateLead(id, payload),
+    onSuccess: async (_data, vars) => {
+      await invalidate()
+      if (vars.notes !== undefined) {
+        setDraftNotes((prev) => {
+          const next = { ...prev }
+          delete next[vars.id]
+          return next
+        })
+      }
       setError(null)
     },
     onError: (err: Error) => setError(err.message),
@@ -68,11 +92,8 @@ export function LeadsPage() {
   const createMutation = useMutation({
     mutationFn: createLead,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['leads'] })
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
-      setCreateOpen(false)
-      setNewCustomerId('')
-      setNewNotes('')
+      await invalidate()
+      closeCreate()
       setError(null)
     },
     onError: (err: Error) => setError(err.message),
@@ -80,254 +101,357 @@ export function LeadsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: deleteLead,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['leads'] })
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
-    },
+    onSuccess: invalidate,
     onError: (err: Error) => setError(err.message),
   })
 
-  function notesValue(lead: Lead) {
-    return draftNotes[lead.id] ?? lead.notes ?? ''
+  function closeCreate() {
+    setCreateOpen(false)
+    setNewCustomerId('')
+    setNewNotes('')
+    setCreateTried(false)
+  }
+
+  function submitCreate() {
+    setCreateTried(true)
+    if (!newCustomerId) return
+    createMutation.mutate({ customer_id: Number(newCustomerId), status: 'new', notes: newNotes.trim() || null })
+  }
+
+  const notesValue = (lead: Lead) => draftNotes[lead.id] ?? lead.notes ?? ''
+  const notesDirty = (lead: Lead) => lead.id in draftNotes && draftNotes[lead.id] !== (lead.notes ?? '')
+
+  function saveNotes(lead: Lead) {
+    if (!notesDirty(lead)) return
+    updateMutation.mutate({ id: lead.id, notes: notesValue(lead).trim() || null })
   }
 
   async function quoteFromLead(lead: Lead) {
     if (!lead.product_id) {
-      navigate(
-        `/app/quotations?customer_id=${lead.customer_id}&lead_id=${lead.id}`,
-      )
+      navigate(`/app/quotations?customer_id=${lead.customer_id}&lead_id=${lead.id}`)
       return
     }
     setQuotingId(lead.id)
     setError(null)
     try {
-      const q = await createQuotation({
-        customer_id: lead.customer_id,
-        product_id: lead.product_id,
-        qty: 1,
-      })
+      const q = await createQuotation({ customer_id: lead.customer_id, product_id: lead.product_id, qty: 1 })
       await downloadQuotationPdf(q.id)
       await queryClient.invalidateQueries({ queryKey: ['quotations'] })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal buat quotation')
+      setError(err instanceof Error ? err.message : 'Penawaran gagal dibuat.')
     } finally {
       setQuotingId(null)
     }
   }
 
+  const counts = useMemo(() => {
+    const out: Record<string, number> = {}
+    for (const l of leads) out[l.status] = (out[l.status] ?? 0) + 1
+    return out
+  }, [leads])
+
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return [...leads]
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .filter((l) => !statusFilter || l.status === statusFilter)
+      .filter(
+        (l) =>
+          !q ||
+          [l.customer_name, l.product_name, l.assignee_name, l.notes, `#${l.id}`]
+            .filter(Boolean)
+            .some((v) => String(v).toLowerCase().includes(q)),
+      )
+  }, [leads, statusFilter, search])
+
+  const assigneeOptions = [{ value: '', label: 'Belum ditugaskan' }, ...assignees.map((a) => ({ value: String(a.id), label: a.name }))]
+  const statusOptions = LEAD_STATUS.map((s) => ({ value: s.value, label: s.label }))
+  const filterTabs = [{ value: '', label: 'Semua', n: leads.length }, ...LEAD_STATUS.map((s) => ({ ...s, n: counts[s.value] ?? 0 }))]
+  const pendingId = updateMutation.isPending ? updateMutation.variables?.id : null
+
   return (
-    <div>
+    <>
       <PageHeader
-        title={isAdmin ? 'Leads' : 'My Leads'}
+        meta={leadsQuery.isSuccess ? `${leads.length} lead${counts.new ? `, ${counts.new} baru` : ''}` : undefined}
+        title={isAdmin ? 'Leads' : 'Lead saya'}
         description={
           isAdmin
-            ? 'Semua lead. Pipeline new / qualified / won / lost. Quotation dari baris lead.'
-            : 'Lead yang di-assign ke Anda. Ubah status, catatan, lalu generate quotation PDF.'
+            ? 'Semua lead dari chat landing dan input manual. Tugaskan ke sales, ubah status, lalu buat penawaran PDF dari barisnya.'
+            : `Lead yang ditugaskan ke ${user?.name ?? 'kamu'}. Ubah status dan catatan setelah menghubungi pelanggan.`
         }
         action={
           <Button type="button" onClick={() => setCreateOpen(true)}>
-            Tambah Lead
+            <Icon name="plus" size={15} stroke={2.2} />
+            Tambah lead
           </Button>
         }
       />
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        {PIPELINE.map((status) => (
-          <span
-            key={status}
-            className="rounded-full bg-brand-light px-3 py-1 text-[11px] font-semibold capitalize text-brand-hover"
+      {error ? <Notice onDismiss={() => setError(null)}>{error}</Notice> : null}
+
+      <Panel>
+        <PanelBar className={leads.length ? '' : 'hidden'}>
+          <div className="flex flex-wrap gap-1" role="group" aria-label="Filter status">
+            {filterTabs.map((t) => {
+              const active = statusFilter === t.value
+              return (
+                <button
+                  key={t.value || 'all'}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setStatusFilter(t.value)}
+                  className={`inline-flex h-8 items-center gap-2 rounded-[8px] px-3 text-[13px] transition-colors duration-200 ${
+                    active ? 'bg-[#121410] font-semibold text-[#D6E56A]' : 'text-muted hover:bg-[#D6E56A]/35 hover:text-text'
+                  }`}
+                >
+                  {t.label}
+                  <Mono className={`text-[11.5px] ${active ? 'text-white/60' : 'text-faint'}`}>{t.n}</Mono>
+                </button>
+              )
+            })}
+          </div>
+          <SearchField
+            label="Cari lead"
+            value={search}
+            onChange={setSearch}
+            placeholder="Cari pelanggan, produk, catatan"
+            className="ml-auto w-full sm:w-72"
+          />
+        </PanelBar>
+
+        {leadsQuery.isLoading ? (
+          <SkeletonRows rows={5} cols={5} />
+        ) : leadsQuery.isError ? (
+          <EmptyState title="Lead gagal dimuat">
+            {leadsQuery.error instanceof Error ? leadsQuery.error.message : 'Server tidak merespons.'} Coba muat ulang halaman.
+          </EmptyState>
+        ) : leads.length === 0 ? (
+          <EmptyState
+            title={isAdmin ? 'Belum ada lead' : 'Belum ada lead untukmu'}
+            action={
+              isAdmin ? (
+                <>
+                  <Button type="button" onClick={() => setCreateOpen(true)}>
+                    Tambah lead manual
+                  </Button>
+                  <a
+                    href="/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex h-9 items-center gap-1.5 rounded-[8px] px-3 text-[13.5px] font-semibold text-text transition-colors duration-200 hover:bg-[#121410]/[0.05]"
+                  >
+                    Coba chat di landing
+                    <Icon name="external" size={14} />
+                  </a>
+                </>
+              ) : undefined
+            }
           >
-            {status}
-          </span>
-        ))}
-        {!isAdmin ? (
-          <span className="rounded-full bg-sidebar px-3 py-1 text-[11px] font-semibold text-muted">
-            filter: assigned to {user?.name || 'saya'}
-          </span>
-        ) : null}
-      </div>
-
-      {error ? <p className="mb-3 text-xs text-danger">{error}</p> : null}
-
-      {createOpen ? (
-        <div className="mb-4 rounded-[16px] border border-border bg-card p-4">
-          <p className="mb-3 text-sm font-semibold text-text">Lead manual</p>
-          <div className="flex flex-wrap items-end gap-3">
-            <label className="flex min-w-[220px] flex-col gap-1 text-xs text-muted">
-              Customer
-              <select
-                value={newCustomerId}
-                onChange={(e) => setNewCustomerId(e.target.value ? Number(e.target.value) : '')}
-                className="rounded-sm border border-border bg-bg px-3 py-2 text-sm text-text outline-none"
+            {isAdmin
+              ? 'Lead masuk otomatis saat pengunjung landing bilang tertarik dan mengisi nama serta WhatsApp. Untuk pelanggan yang datang lewat telepon atau toko, tambahkan manual.'
+              : 'Admin akan menugaskan lead ke kamu, atau sistem membaginya otomatis dari chat landing.'}
+          </EmptyState>
+        ) : visible.length === 0 ? (
+          <EmptyState
+            title="Tidak ada lead yang cocok"
+            action={
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setSearch('')
+                  setStatusFilter('')
+                }}
               >
-                <option value="">Pilih customer...</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex min-w-[240px] flex-1 flex-col gap-1 text-xs text-muted">
-              Notes
-              <input
-                value={newNotes}
-                onChange={(e) => setNewNotes(e.target.value)}
-                className="rounded-sm border border-border bg-bg px-3 py-2 text-sm text-text outline-none"
-                placeholder="Opsional"
-              />
-            </label>
-            <Button
-              type="button"
-              disabled={!newCustomerId || createMutation.isPending}
-              onClick={() =>
-                createMutation.mutate({
-                  customer_id: Number(newCustomerId),
-                  status: 'new',
-                  notes: newNotes || null,
-                })
-              }
-            >
-              Simpan
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>
+                Hapus filter
+              </Button>
+            }
+          >
+            Coba kata kunci lain atau pilih status Semua.
+          </EmptyState>
+        ) : (
+          <div className="relative overflow-x-auto">
+            <table className="w-full min-w-[1080px] text-[13.5px]">
+              <thead>
+                <tr>
+                  <th className={thClass}>Pelanggan</th>
+                  <th className={thClass}>Produk minat</th>
+                  {isAdmin ? <th className={thClass}>Sales</th> : null}
+                  <th className={thClass}>Status</th>
+                  <th className={thClass}>Catatan</th>
+                  <th className={`${thClass} text-right`}>
+                    <span className="sr-only">Aksi</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((lead) => {
+                  const s = leadStatus(lead.status)
+                  const dirty = notesDirty(lead)
+                  const busy = pendingId === lead.id
+                  return (
+                    <tr key={lead.id} className={trClass}>
+                      <td className={tdClass}>
+                        <div className="font-semibold">{lead.customer_name}</div>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted">
+                          <Mono>#{lead.id}</Mono>
+                          <span title={formatDate(lead.created_at, true)}>{formatRelative(lead.created_at)}</span>
+                          <Badge tone="neutral">{SOURCE_LABEL[lead.source || 'manual'] ?? lead.source}</Badge>
+                        </div>
+                      </td>
+                      <td className={`${tdClass} max-w-[220px]`}>
+                        {lead.product_name ? (
+                          <span className="line-clamp-2">{lead.product_name}</span>
+                        ) : (
+                          <span className="whitespace-nowrap text-faint">Belum dipilih</span>
+                        )}
+                        {lead.handoff_reason ? (
+                          <p className="mt-1 line-clamp-2 text-[12px] text-muted" title={lead.handoff_reason}>
+                            {lead.handoff_reason}
+                          </p>
+                        ) : null}
+                      </td>
+                      {isAdmin ? (
+                        <td className={`${tdClass} w-[180px]`}>
+                          <Dropdown
+                            label={`Sales untuk lead #${lead.id}`}
+                            hideLabel
+                            size="sm"
+                            value={lead.assigned_to ? String(lead.assigned_to) : ''}
+                            options={assigneeOptions}
+                            disabled={busy}
+                            onChange={(v) => updateMutation.mutate({ id: lead.id, assigned_to: v ? Number(v) : null })}
+                          />
+                        </td>
+                      ) : null}
+                      <td className={`${tdClass} w-[140px]`}>
+                        <div className="flex items-center gap-2">
+                          <span aria-hidden className={`h-2 w-2 shrink-0 ${s.tone === 'lime' ? 'bg-[#B8C93E]' : s.tone === 'ink' ? 'bg-[#121410]' : s.tone === 'danger' ? 'bg-danger' : 'bg-[#121410]/35'}`} />
+                          <Dropdown
+                            label={`Status lead #${lead.id}`}
+                            hideLabel
+                            size="sm"
+                            value={lead.status}
+                            options={statusOptions}
+                            disabled={busy}
+                            onChange={(v) => updateMutation.mutate({ id: lead.id, status: v })}
+                          />
+                        </div>
+                      </td>
+                      <td className={`${tdClass} w-[260px]`}>
+                        <form
+                          className="flex items-center gap-1.5"
+                          onSubmit={(e) => {
+                            e.preventDefault()
+                            saveNotes(lead)
+                          }}
+                        >
+                          <input
+                            aria-label={`Catatan lead #${lead.id}`}
+                            value={notesValue(lead)}
+                            onChange={(e) => setDraftNotes((prev) => ({ ...prev, [lead.id]: e.target.value }))}
+                            onKeyDown={(e) => {
+                              if (e.key !== 'Escape') return
+                              setDraftNotes((prev) => {
+                                const next = { ...prev }
+                                delete next[lead.id]
+                                return next
+                              })
+                            }}
+                            className={`${fieldClass} h-8 text-[13px]`}
+                            placeholder="Tambah catatan"
+                          />
+                          {dirty ? (
+                            <Button type="submit" size="sm" disabled={busy}>
+                              {busy ? 'Menyimpan' : 'Simpan'}
+                            </Button>
+                          ) : null}
+                        </form>
+                      </td>
+                      <td className={`${tdClass} w-[1%] whitespace-nowrap`}>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            disabled={quotingId === lead.id}
+                            onClick={() => void quoteFromLead(lead)}
+                            title={lead.product_id ? 'Buat penawaran dan unduh PDF' : 'Pilih produk dulu di halaman Penawaran'}
+                          >
+                            <Icon name={lead.product_id ? 'download' : 'doc'} size={14} />
+                            {quotingId === lead.id ? 'Membuat PDF' : lead.product_id ? 'Penawaran PDF' : 'Buat penawaran'}
+                          </Button>
+                          <ConfirmDelete
+                            itemName={`lead #${lead.id} (${lead.customer_name})`}
+                            busy={deleteMutation.isPending && deleteMutation.variables === lead.id}
+                            onConfirm={() => deleteMutation.mutate(lead.id)}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
+
+      <Drawer
+        open={createOpen}
+        onClose={closeCreate}
+        title="Tambah lead"
+        description="Untuk pelanggan yang menghubungi lewat telepon, toko, atau WhatsApp langsung. Status awal: Baru."
+        footer={
+          <>
+            <Button type="button" variant="ghost" onClick={closeCreate}>
               Batal
             </Button>
+            <Button type="submit" form="lead-create" disabled={createMutation.isPending}>
+              {createMutation.isPending ? 'Menyimpan' : 'Simpan lead'}
+            </Button>
+          </>
+        }
+      >
+        <form
+          id="lead-create"
+          className="flex flex-col gap-5 px-5 py-5"
+          onSubmit={(e) => {
+            e.preventDefault()
+            submitCreate()
+          }}
+        >
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[12.5px] font-semibold">Pelanggan</span>
+            <Dropdown
+              label="Pelanggan"
+              hideLabel
+              value={newCustomerId}
+              placeholder={customers.length ? 'Pilih pelanggan' : 'Belum ada pelanggan'}
+              options={customers.map((c) => ({ value: String(c.id), label: c.name, hint: c.whatsapp || c.city || undefined }))}
+              onChange={setNewCustomerId}
+            />
+            {createTried && !newCustomerId ? (
+              <span role="alert" className="text-[12px] text-danger">
+                Pilih pelanggan dulu.
+              </span>
+            ) : (
+              <span className="text-[12px] text-muted">
+                Pelanggan baru dibuat di halaman Pelanggan.
+              </span>
+            )}
           </div>
-        </div>
-      ) : null}
-
-      {isLoading ? (
-        <p className="text-sm text-muted">Memuat leads...</p>
-      ) : leads.length === 0 ? (
-        <div className="rounded-[16px] border border-dashed border-border bg-card p-10 text-center">
-          <p className="text-sm text-muted">
-            {isAdmin
-              ? 'Belum ada lead. Dari landing chat bilang "Saya tertarik", atau tambah manual.'
-              : 'Belum ada lead yang di-assign ke Anda.'}
-          </p>
-        </div>
-      ) : (
-        <div className="overflow-x-auto overflow-hidden rounded-[16px] border border-border bg-card">
-          <table className="w-full min-w-[960px] text-left text-sm">
-            <thead className="border-b border-divider bg-sidebar text-xs text-faint">
-              <tr>
-                <th className="px-4 py-3 font-semibold">ID</th>
-                <th className="px-4 py-3 font-semibold">Customer</th>
-                <th className="px-4 py-3 font-semibold">Source</th>
-                <th className="px-4 py-3 font-semibold">Assignee</th>
-                <th className="px-4 py-3 font-semibold">Produk</th>
-                <th className="px-4 py-3 font-semibold">Status</th>
-                <th className="px-4 py-3 font-semibold">Notes</th>
-                <th className="px-4 py-3 font-semibold">Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {leads.map((lead) => (
-                <tr key={lead.id} className="border-b border-divider last:border-0">
-                  <td className="px-4 py-3 text-muted">#{lead.id}</td>
-                  <td className="px-4 py-3 font-semibold text-text">{lead.customer_name}</td>
-                  <td className="px-4 py-3">
-                    <span className="rounded-full bg-sidebar px-2 py-0.5 text-[11px] font-medium text-muted">
-                      {lead.source || 'manual'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    {isAdmin ? (
-                      <select
-                        value={lead.assigned_to ?? ''}
-                        onChange={(e) =>
-                          updateMutation.mutate({
-                            id: lead.id,
-                            assigned_to: e.target.value ? Number(e.target.value) : null,
-                          })
-                        }
-                        className="max-w-[160px] rounded-sm border border-border bg-bg px-2 py-1.5 text-xs text-text outline-none"
-                      >
-                        <option value="">Belum assign</option>
-                        {assignees.map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {a.name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span className="text-xs text-muted">{lead.assignee_name || user?.name || '-'}</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-muted">{lead.product_name || '-'}</td>
-                  <td className="px-4 py-3">
-                    <select
-                      value={lead.status}
-                      onChange={(e) =>
-                        updateMutation.mutate({ id: lead.id, status: e.target.value })
-                      }
-                      className="rounded-sm border border-border bg-bg px-2 py-1.5 text-xs capitalize text-text outline-none"
-                    >
-                      {PIPELINE.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex min-w-[180px] items-center gap-2">
-                      <input
-                        value={notesValue(lead)}
-                        onChange={(e) =>
-                          setDraftNotes((prev) => ({ ...prev, [lead.id]: e.target.value }))
-                        }
-                        className="w-full rounded-sm border border-border bg-bg px-2 py-1.5 text-xs text-text outline-none"
-                        placeholder="Catatan..."
-                      />
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        className="px-2 py-1 text-xs"
-                        disabled={updateMutation.isPending}
-                        onClick={() =>
-                          updateMutation.mutate({
-                            id: lead.id,
-                            notes: notesValue(lead) || null,
-                          })
-                        }
-                      >
-                        Simpan
-                      </Button>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-col gap-1.5">
-                      <button
-                        type="button"
-                        className="text-left text-xs font-semibold text-brand disabled:opacity-50"
-                        disabled={quotingId === lead.id}
-                        onClick={() => void quoteFromLead(lead)}
-                      >
-                        {quotingId === lead.id
-                          ? 'PDF...'
-                          : lead.product_id
-                            ? 'Quotation PDF'
-                            : 'Quotation...'}
-                      </button>
-                      <button
-                        type="button"
-                        className="text-left text-xs font-semibold text-danger"
-                        onClick={() => {
-                          if (confirm(`Hapus lead #${lead.id}?`)) deleteMutation.mutate(lead.id)
-                        }}
-                      >
-                        Hapus
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+          <Field label="Catatan" hint="Opsional. Misalnya kebutuhan, budget, atau jadwal follow up.">
+            <textarea
+              value={newNotes}
+              onChange={(e) => setNewNotes(e.target.value)}
+              rows={4}
+              className={`${fieldClass} h-auto py-2 leading-relaxed`}
+              placeholder="Butuh laptop editing, budget sekitar 20 juta"
+            />
+          </Field>
+        </form>
+      </Drawer>
+    </>
   )
 }

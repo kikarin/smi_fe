@@ -1,8 +1,10 @@
 @import 'tailwindcss';
 
 @theme {
-  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  --font-display: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-grotesk: 'Geist', 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --color-bg: #F4F3F1;
   --color-sidebar: #F7F6F4;
@@ -13,20 +15,20 @@
   --color-muted: #767676;
   --color-faint: #A5A5A5;
 
-  --color-brand: #3AA39A;
-  --color-brand-hover: #2F9189;
-  --color-brand-light: #DDF4F2;
+  --color-brand: #121410;
+  --color-brand-hover: #2A2D26;
+  --color-brand-light: #EEF3C4;
 
-  --color-highlight: #EEFF8C;
-  --color-highlight-hover: #F5FFD1;
+  --color-highlight: #D6E56A;
+  --color-highlight-hover: #E2EE93;
 
-  --color-success: #6BC98F;
-  --color-warning: #F8C35E;
-  --color-danger: #E96D6D;
+  --color-success: #4E9A6A;
+  --color-warning: #C9932E;
+  --color-danger: #C8504B;
 
   /* dark graphite surface — hero panels, chat bezel, AI avatars */
-  --color-ink: #12151A;
-  --color-ink-hover: #1C2028;
+  --color-ink: #121410;
+  --color-ink-hover: #2A2D26;
   --color-ink-soft: rgba(255, 255, 255, 0.6);
 
   --radius-card: 24px;
@@ -42,7 +44,7 @@ html, body, #root {
   height: 100%;
   margin: 0;
   padding: 0;
-  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
   font-variant-numeric: tabular-nums;
   background-color: #F4F3F1;
   color: #1F1F1F;
@@ -54,8 +56,66 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
-  letter-spacing: -0.02em;
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.ds-page {
+  font-family: var(--font-grotesk);
+}
+
+.ds-page :is(h1, h2, h3) {
+  font-family: var(--font-grotesk);
+  letter-spacing: -0.035em;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+@keyframes console-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.console-rise {
+  /* backwards, bukan both: animasi transform yang tetap "filling" menjadikan elemen ini containing block untuk position: fixed. */
+  animation: console-rise 420ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+@keyframes console-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+.console-skeleton {
+  background: linear-gradient(90deg, rgba(18, 20, 16, 0.05) 25%, rgba(18, 20, 16, 0.1) 50%, rgba(18, 20, 16, 0.05) 75%);
+  background-size: 200% 100%;
+  animation: console-shimmer 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .console-rise,
+  .console-skeleton {
+    animation: none;
+  }
 }
 
 ::-webkit-scrollbar {

@@ -11,3 +11,14 @@ export type PublicProduct = {
   gpu: string
   thumbnail: string | null
 }
+
+export type PublicStore = {
+  name: string
+  whatsapp: string | null
+  sales_count: number
+  address: string | null
+  hours: string | null
+  warranty: string | null
+  payment: string | null
+  shipping: string | null
+}

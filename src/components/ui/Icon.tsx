@@ -16,8 +16,16 @@ export const icons = {
   refresh:
     'M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15',
   chevLeft: 'M15 18l-6-6 6-6',
+  chevDown: 'M6 9l6 6 6-6',
+  check: 'M20 6L9 17l-5-5',
   arrowRight: 'M5 12h14M13 6l6 6-6 6',
   x: 'M18 6L6 18M6 6l12 12',
+  download: 'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3',
+  upload: 'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12',
+  pencil: 'M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z',
+  trash: 'M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6',
+  external: 'M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3',
+  send: 'M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z',
 } as const
 
 export type IconName = keyof typeof icons

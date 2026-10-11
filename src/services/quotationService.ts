@@ -1,8 +1,6 @@
 import { useAuthStore } from '@/store/authStore'
-import { apiFetch, ApiError } from './api'
+import { apiFetch, ApiError, API_BASE_URL } from './api'
 import type { Quotation, QuotationInput } from '@/types'
-
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 
 export function fetchQuotations() {
   return apiFetch<Quotation[]>('/api/quotations')
@@ -18,7 +16,7 @@ export function deleteQuotation(id: number) {
 
 export async function downloadQuotationPdf(id: number, filename?: string) {
   const token = useAuthStore.getState().token
-  const res = await fetch(`${BASE_URL}/api/quotations/${id}/pdf`, {
+  const res = await fetch(`${API_BASE_URL}/api/quotations/${id}/pdf`, {
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },

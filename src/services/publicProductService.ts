@@ -1,5 +1,9 @@
 import { apiFetch } from '@/services/api'
-import type { PublicProduct } from '@/types/public'
+import type { PublicProduct, PublicStore } from '@/types/public'
+
+export function fetchPublicStore() {
+  return apiFetch<PublicStore>('/api/public/store', { auth: false })
+}
 
 export type PublicProductQuery = {
   budget_min?: number
